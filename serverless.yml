@@ -1,0 +1,65 @@
+service: ${self:provider.stage}${self:provider.microservicename} # NOTE: a-z and 0-9, lowercase, no symbols. This acts as the unique id of the function. Example name: pruductionapi
+
+provider:
+  name: google
+  runtime: nodejs8
+  project: rebill-226211
+  memorySize: 1024
+  timeout: 90s
+  region: us-east1
+  # the path to the credentials file needs to be absolute
+  credentials: ~/keys/googlecloud.json
+  stage: ${opt:stage, "development"}
+  microservicename: yourmicroservicename
+
+plugins:
+  - serverless-google-cloudfunctions
+  - serverless-plugin-scripts
+
+custom:
+  scripts:
+    commands:
+      deploy-production: (serverless update-package-json --stage production && serverless deploy --stage production)
+      deploy-staging: (serverless update-package-json --stage staging && serverless deploy --stage staging)
+      deploy-sandbox: (serverless update-package-json --stage sandbox && serverless deploy --stage sandbox)
+      deploy-dev: (npm install && serverless update-package-json --stage development && nodemon -L index.js)
+      install-dependencies-mac: (brew install jq && brew install moreutils)
+      install-dependencies-linux: (apt-get install jq && sudo apt-get install moreutils)
+      #On Debian-based systems such as Ubuntu, you can install it via sudo apt-get install jq
+      #On macOS, with Homebrew (http://brew.sh/) installed, use brew install jq
+      #brew install moreutils
+      update-package-json: jq '.name = "${self:provider.stage}_micro_${self:provider.microservicename}"' package.json|sponge package.json
+
+# needs more granular excluding in production as only the serverless provider npm
+# package should be excluded (and not the whole node_modules directory)
+package:
+  exclude:
+    - node_modules/**
+    - .gitignore
+    - .git/**
+
+functions:
+  first:
+    handler: ${self:provider.stage}_micro_${self:provider.microservicename}
+    events:
+      - http: path
+
+  # NOTE: the following uses an "event" event (pubSub event in this case).
+  # Please create the corresponding resources in the Google Cloud
+  # before deploying this service through Serverless
+
+  #second:
+  #  handler: event
+  #  events:
+  #    - event:
+  #        eventType: providers/cloud.pubsub/eventTypes/topic.publish
+  #        resource: projects/*/topics/my-topic
+
+# you can define resources, templates etc. the same way you would in a
+# Google Cloud deployment configuration
+#resources:
+#  resources:
+#    - type: storage.v1.bucket
+#      name: my-serverless-service-bucket
+#  imports:
+#    - path: my_template.jinja
